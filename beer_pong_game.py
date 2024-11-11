@@ -70,11 +70,16 @@ def get_high_scores(limit=10):
 # Initialize database
 setup_database()
 
+def sensor_triggered(cup_number):
+    hit_cup(cup_number)
+    print("Cup")
+    print(cup_number)
+
 def initialize_sensors():
     global sensor_system
     try:
         sensor_system = start_sensor_system()
-        sensor_system.set_hit_callback(lambda cup_number: hit_cup(cup_number))
+        sensor_system.set_hit_callback(sensor_triggered)
         print("Sensor system initialized successfully")
     except Exception as e:
         print(f"Failed to initialize sensors: {e}")
