@@ -265,14 +265,6 @@ def main():
     # Set up the initial cup formation
     setup_cup_formation(start_x, start_y, cup_radius, spacing)
 
-    # Initialize sensors after pygame setup but before game loop
-    initialize_sensors()
-
-    # Start sensor monitoring thread
-    sensor_monitor_thread = threading.Thread(target=monitor_sensors, daemon=True)
-    sensor_monitor_thread.start()
-    print("Sensor monitoring thread started")
-
     # Fonts
     font = pygame.font.Font(None, 36)
     medium_font = pygame.font.Font(None, 128)
@@ -285,13 +277,12 @@ def main():
 
     running = True
     while running:
-        # Handle all pygame events
+        running = handle_events()
+        screen.fill(WHITE)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                break
-        # Your existing game state handling code
-        screen.fill(WHITE)
 
         # Example of how to use hit_cup() with keyboard numbers (for testing)
         keys = pygame.key.get_pressed()
@@ -350,8 +341,6 @@ def main():
             pygame.draw.rect(screen, RED, continue_button_rect)
             draw_text(screen, "Continue", font, WHITE, continue_button_rect.centerx, continue_button_rect.centery)
             draw_high_scores(screen)
-
-        # Give other threads a chance to run
         time.sleep(0.001)
         pygame.display.flip()
         clock.tick(60)
@@ -362,6 +351,122 @@ def main():
 
     pygame.quit()
     sys.exit()
+
+# def main():
+#     global game_state, start_time, score, sensor_system, is_running
+
+#     initialize_sensors()
+
+#     clock = pygame.time.Clock()
+
+#     # Calculate cup size and spacing based on screen size
+#     cup_radius = min(width, height) // 25
+#     spacing = cup_radius // 2
+
+#     # Calculate starting position to center the formation in the left 2/3 of the screen
+#     start_x = width // 3
+#     start_y = height // 2 - (3 * (cup_radius * 2 + spacing) * 0.866) // 2
+
+#     # Set up the initial cup formation
+#     setup_cup_formation(start_x, start_y, cup_radius, spacing)
+
+#     # Initialize sensors after pygame setup but before game loop
+#     initialize_sensors()
+
+#     # Start sensor monitoring thread
+#     sensor_monitor_thread = threading.Thread(target=monitor_sensors, daemon=True)
+#     sensor_monitor_thread.start()
+#     print("Sensor monitoring thread started")
+
+#     # Fonts
+#     font = pygame.font.Font(None, 36)
+#     medium_font = pygame.font.Font(None, 128)
+#     large_font = pygame.font.Font(None, 256)
+
+#     # Images
+#     background_image = pygame.image.load("images/ArrowTechHubTransparentLightMode.png")
+#     background_image = pygame.transform.scale(background_image, (1200, 1200))
+#     image_rect = background_image.get_rect()
+
+#     running = True
+#     while running:
+#         # Handle all pygame events
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 running = False
+#                 break
+#         # Your existing game state handling code
+#         screen.fill(WHITE)
+
+#         # Example of how to use hit_cup() with keyboard numbers (for testing)
+#         keys = pygame.key.get_pressed()
+#         if game_state == "playing":
+#             for i in range(10):  # 0-9 keys
+#                 if keys[pygame.K_0 + i]:
+#                     hit_cup(i)
+
+#         if game_state == "start_screen":
+#             # Draw start screen
+#             background_x = (screen.get_width() - image_rect.width) // 2
+#             background_y = (screen.get_height() - image_rect.height) // 2
+#             screen.blit(background_image, (background_x, background_y))
+#             draw_text(screen, "Beer Pong", large_font, BLACK, width // 2, 450)
+#             pygame.draw.rect(screen, RED, start_button_rect)
+#             draw_text(screen, "Start Game", font, WHITE, start_button_rect.centerx, start_button_rect.centery)
+#             draw_high_scores(screen)
+
+#         elif game_state == "input_name":
+#             # Draw name input screen
+#             draw_text(screen, "Enter Your Name", medium_font, BLACK, width // 2, height // 3)
+#             # Draw name input box
+#             input_box_rect = pygame.Rect(width // 2 - 200, height // 2 - 25, 400, 50)
+#             pygame.draw.rect(screen, BLACK, input_box_rect, 2)
+#             draw_text(screen, player_name, font, BLACK, width // 2, height // 2)
+#             # Draw start button
+#             pygame.draw.rect(screen, RED, name_submit_rect)
+#             draw_text(screen, "Start Game", font, WHITE, name_submit_rect.centerx, name_submit_rect.centery)
+#             draw_high_scores(screen)
+
+#         elif game_state == "countdown":
+#             countdown = 3 - int(time.time() - start_time)
+#             if countdown > 0:
+#                 draw_text(screen, str(countdown), large_font, BLACK, width // 2, height // 2)
+#             else:
+#                 game_state = "playing"
+#                 start_time = time.time()
+#                 score = 0
+
+#         elif game_state == "playing":
+#             draw_cup_formation(screen)
+#             elapsed_time = int(time.time() - start_time)
+#             remaining_time = max(0, game_duration - elapsed_time)
+#             draw_text(screen, f"Player: {player_name} - Points {score}", font, BLACK, 10, 10, False)
+#             draw_text(screen, f"Time: {remaining_time}", medium_font, BLACK, 10, 100, False)
+#             draw_high_scores(screen)
+
+#             if remaining_time == 0:
+#                 game_state = "game_over"
+#                 save_score(player_name, score)
+
+#         elif game_state == "game_over":
+#             draw_text(screen, "Game Over", large_font, BLACK, width // 2, height // 2 - 50)
+#             draw_text(screen, f"Your score: {score}", font, BLACK, width // 2, height // 2 + 50)
+#             # Draw continue button
+#             pygame.draw.rect(screen, RED, continue_button_rect)
+#             draw_text(screen, "Continue", font, WHITE, continue_button_rect.centerx, continue_button_rect.centery)
+#             draw_high_scores(screen)
+
+#         # Give other threads a chance to run
+#         time.sleep(0.001)
+#         pygame.display.flip()
+#         clock.tick(60)
+
+#         if not running:
+#             # Clean up sensors before exiting
+#             cleanup_sensors()
+
+#     pygame.quit()
+#     sys.exit()
 
 
 # def main2():
