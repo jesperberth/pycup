@@ -7,6 +7,8 @@ from sensor_integration import start_sensor_system
 import threading
 
 sensor_system = None
+sensor_monitor_thread = None
+is_running = True
 game_lock = threading.Lock()
 
 # Initialize Pygame
@@ -73,6 +75,17 @@ def get_high_scores(limit=10):
 # Initialize database
 setup_database()
 
+def monitor_sensors():
+    """Dedicated thread for monitoring sensor status"""
+    global is_running
+    while is_running:
+        if sensor_system and sensor_system.is_running():
+            # Print status every 5 seconds
+            current_time = int(time.time())
+            if current_time % 5 == 0:
+                print(f"Sensor system active at {current_time}")
+        time.sleep(0.1)
+
 def sensor_hit_cup(cup_number):
     """Wrapper function to handle sensor triggers"""
     global game_state
@@ -91,18 +104,25 @@ def sensor_triggered(cup_number):
 
 def initialize_sensors():
     """Initialize the sensor system when the game starts"""
-    global sensor_system
+    global sensor_system, sensor_monitor_thread
     try:
         sensor_system = start_sensor_system()
-        sensor_system.set_hit_callback(sensor_hit_cup)
+        sensor_system.set_hit_callback(lambda cup_number: hit_cup(cup_number))
         print("Sensor system initialized successfully")
+        
+        # Start the monitoring thread
+        sensor_monitor_thread = threading.Thread(target=monitor_sensors, daemon=True)
+        sensor_monitor_thread.start()
+        print("Sensor monitoring thread started")
+        
     except Exception as e:
         print(f"Failed to initialize sensors: {e}")
         sensor_system = None
 
 def cleanup_sensors():
     """Clean up the sensor system when the game exits"""
-    global sensor_system
+    global sensor_system, is_running
+    is_running = False
     if sensor_system:
         sensor_system.stop_monitoring()
         print("Sensor system stopped")
@@ -226,7 +246,7 @@ def handle_cup_click(pos):
             break
 
 def main():
-    global game_state, start_time, score, sensor_system
+    global game_state, start_time, score, sensor_system, is_running
 
     initialize_sensors()
 
@@ -257,6 +277,10 @@ def main():
     while running:
         running = handle_events()
         screen.fill(WHITE)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
         # Example of how to use hit_cup() with keyboard numbers (for testing)
         keys = pygame.key.get_pressed()
@@ -315,7 +339,7 @@ def main():
             pygame.draw.rect(screen, RED, continue_button_rect)
             draw_text(screen, "Continue", font, WHITE, continue_button_rect.centerx, continue_button_rect.centery)
             draw_high_scores(screen)
-
+        time.sleep(0.001)
         pygame.display.flip()
         clock.tick(60)
 
@@ -330,11 +354,9 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        # Make sure to clean up sensors even if there's an error
+        print(f"Error in main: {e}")
         cleanup_sensors()
-        raise e
     finally:
-        # Final cleanup
         cleanup_sensors()
         pygame.quit()
         sys.exit()
