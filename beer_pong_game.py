@@ -174,6 +174,8 @@ def handle_events():
     return True
 
 def hit_cup(cup_number):
+    print("Hit_Cup")
+    print(cup_number)
     """
     Hit a specific cup by its number (0-9).
     Uses the same scoring rules as mouse clicks:
