@@ -71,10 +71,10 @@ def get_high_scores(limit=10):
 setup_database()
 
 def initialize_sensors():
-    """Initialize the sensor system when the game starts"""
     global sensor_system
     try:
         sensor_system = start_sensor_system()
+        sensor_system.set_hit_callback(hit_cup)  # Set the callback to your hit_cup function
         print("Sensor system initialized successfully")
     except Exception as e:
         print(f"Failed to initialize sensors: {e}")
