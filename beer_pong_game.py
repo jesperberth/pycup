@@ -74,7 +74,7 @@ def initialize_sensors():
     global sensor_system
     try:
         sensor_system = start_sensor_system()
-        sensor_system.set_hit_callback(hit_cup)  # Set the callback to your hit_cup function
+        sensor_system.set_hit_callback(lambda cup_number: hit_cup(cup_number))
         print("Sensor system initialized successfully")
     except Exception as e:
         print(f"Failed to initialize sensors: {e}")
