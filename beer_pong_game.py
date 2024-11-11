@@ -290,6 +290,8 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
                 break
+        # Your existing game state handling code
+        screen.fill(WHITE)
 
         # Example of how to use hit_cup() with keyboard numbers (for testing)
         keys = pygame.key.get_pressed()
