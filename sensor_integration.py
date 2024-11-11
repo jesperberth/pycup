@@ -6,21 +6,31 @@ def start_sensor_system():
     system = SensorSystem()
     system.setup_sensors()
     system.calibrate_all_sensors()
-    print("Starting sensor monitoring...")
     system.start_monitoring()
+    
+    # Verify the system is running
+    if system.is_running():
+        print("Sensor system is running and monitoring")
+    else:
+        print("Warning: Sensor system may not be running properly")
+    
     return system
-
-# Add a debug version of hit_cup to verify the sensor triggers
-def debug_hit_cup(cup_number):
-    print(f"DEBUG: hit_cup called for cup {cup_number}")
 
 if __name__ == '__main__':
     try:
-        system = start_sensor_system()
-        system.set_hit_callback(debug_hit_cup)
+        # Test function to print when a sensor is triggered
+        def test_hit(sensor_id):
+            print(f"Test hit on sensor {sensor_id}")
 
-        print("Sensor system running. Press Ctrl+C to exit.")
+        system = start_sensor_system()
+        system.set_hit_callback(test_hit)
+        
+        print("Running sensor test. Press Ctrl+C to exit.")
+        # Monitor the system status
         while True:
+            if not system.is_running():
+                print("Warning: Sensor system stopped running!")
+                break
             time.sleep(1)
 
     except KeyboardInterrupt:

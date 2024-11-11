@@ -46,7 +46,7 @@ class UltrasonicSensor:
             dist = self.measure_distance()
             measurements.append(dist)
             time.sleep(0.1)
-
+        
         self.baseline = statistics.median(measurements)
         print(f"Sensor {self.sensor_id} baseline: {self.baseline:.2f} cm")
         return self.baseline
@@ -78,11 +78,13 @@ class SensorSystem:
         self.threads = []
         self.lock = Lock()
         self.debounce_time = 1.0  # Debounce time in seconds
-        self.hit_callback = None  # Callback function for when a sensor is triggered
+        self.hit_callback = None
+        print("SensorSystem initialized")
 
     def set_hit_callback(self, callback):
         """Set the callback function to be called when a sensor is triggered"""
         self.hit_callback = callback
+        print("Callback function set")
 
     def setup_sensors(self):
         for i, pins in enumerate(self.sensor_pins):
@@ -93,45 +95,67 @@ class SensorSystem:
                 i
             )
             self.sensors.append(sensor)
+        print(f"Setup completed for {len(self.sensors)} sensors")
 
     def calibrate_all_sensors(self):
-        print("Calibrating all sensors...")
+        print("Starting sensor calibration...")
         for sensor in self.sensors:
             sensor.calibrate()
         print("Calibration complete!")
 
     def monitor_sensor(self, sensor):
+        print(f"Started monitoring thread for sensor {sensor.sensor_id}")
         while self.running:
-            current_distance = sensor.measure_distance()
-            threshold = sensor.baseline * 0.10  # 10% threshold
-            current_time = time.time()
+            try:
+                current_distance = sensor.measure_distance()
+                threshold = sensor.baseline * 0.10  # 10% threshold
+                current_time = time.time()
 
-            if (abs(current_distance - sensor.baseline) > threshold and
-                current_time - sensor.last_trigger_time > self.debounce_time):
-                with self.lock:
-                    if self.hit_callback:
-                        self.hit_callback(sensor.sensor_id)
-                    sensor.last_trigger_time = current_time
-                    print(f"Sensor {sensor.sensor_id} triggered!")
+                # Add distance debugging every few seconds
+                if sensor.sensor_id == 0 and int(current_time) % 5 == 0:
+                    print(f"Sensor 0 distance: {current_distance:.2f} cm (baseline: {sensor.baseline:.2f} cm)")
 
+                if (abs(current_distance - sensor.baseline) > threshold and 
+                    current_time - sensor.last_trigger_time > self.debounce_time):
+                    with self.lock:
+                        print(f"Motion detected on sensor {sensor.sensor_id}!")
+                        print(f"Distance: {current_distance:.2f} cm (baseline: {sensor.baseline:.2f} cm)")
+                        if self.hit_callback:
+                            print(f"Calling hit callback for sensor {sensor.sensor_id}")
+                            self.hit_callback(sensor.sensor_id)
+                        else:
+                            print("Warning: No callback function set!")
+                        sensor.last_trigger_time = current_time
+            except Exception as e:
+                print(f"Error in sensor {sensor.sensor_id} monitoring: {e}")
+            
             time.sleep(0.1)
+        
+        print(f"Stopped monitoring thread for sensor {sensor.sensor_id}")
 
     def start_monitoring(self):
+        print("Starting sensor monitoring...")
         self.running = True
         self.threads = []
-
+        
         for sensor in self.sensors:
-            thread = Thread(target=self.monitor_sensor, args=(sensor,))
-            thread.daemon = True
+            thread = Thread(target=self.monitor_sensor, args=(sensor,), daemon=True)
             thread.start()
             self.threads.append(thread)
+        print(f"Started {len(self.threads)} monitoring threads")
 
     def stop_monitoring(self):
+        print("Stopping sensor monitoring...")
         self.running = False
         for thread in self.threads:
             thread.join()
-
+        
         for sensor in self.sensors:
             sensor.cleanup()
-
+        
         self.chip.close()
+        print("Sensor monitoring stopped and cleaned up")
+
+    def is_running(self):
+        """Check if the sensor system is running"""
+        return self.running and all(thread.is_alive() for thread in self.threads)
