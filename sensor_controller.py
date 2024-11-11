@@ -62,15 +62,15 @@ class SensorSystem:
         # Define pin mappings for 10 sensors
         self.sensor_pins = [
             {"trigger": 23, "echo": 24},  # Sensor 0
-            {"trigger": 17, "echo": 27},  # Sensor 1
-            {"trigger": 22, "echo": 10},  # Sensor 2
-            {"trigger": 9, "echo": 11},   # Sensor 3
-            {"trigger": 5, "echo": 6},    # Sensor 4
-            {"trigger": 13, "echo": 19},  # Sensor 5
-            {"trigger": 26, "echo": 21},  # Sensor 6
-            {"trigger": 20, "echo": 16},  # Sensor 7
-            {"trigger": 12, "echo": 7},   # Sensor 8
-            {"trigger": 8, "echo": 25},   # Sensor 9
+            # {"trigger": 17, "echo": 27},  # Sensor 1
+            # {"trigger": 22, "echo": 10},  # Sensor 2
+            # {"trigger": 9, "echo": 11},   # Sensor 3
+            # {"trigger": 5, "echo": 6},    # Sensor 4
+            # {"trigger": 13, "echo": 19},  # Sensor 5
+            # {"trigger": 26, "echo": 21},  # Sensor 6
+            # {"trigger": 20, "echo": 16},  # Sensor 7
+            # {"trigger": 12, "echo": 7},   # Sensor 8
+            # {"trigger": 8, "echo": 25},   # Sensor 9
         ]
         self.chip = gpiod.Chip('4')  # For Raspberry Pi 5
         self.sensors = []
