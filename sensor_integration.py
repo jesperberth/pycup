@@ -1,3 +1,4 @@
+import time
 from sensor_controller import SensorSystem
 
 def start_sensor_system():
