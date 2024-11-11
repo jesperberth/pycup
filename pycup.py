@@ -1,6 +1,8 @@
 import pygame
 import sys
 import time
+import sqlite3
+from datetime import datetime
 
 # Initialize Pygame
 pygame.init()
@@ -24,10 +26,47 @@ cups = [{"pos": (0, 0), "color": WHITE, "radius": 0, "hit_time": 0, "hits": 0, "
 # Game variables
 player_name = ""
 score = 0
-high_scores = []
-game_state = "input_name"  # States: "input_name", "start_screen", "countdown", "playing", "game_over"
+game_state = "start_screen"  # Changed initial state to start_screen
 start_time = 0
 game_duration = 10  # seconds
+
+# Button rectangles
+start_button_rect = pygame.Rect(width // 2 - 100, height * 3 // 4, 200, 50)
+name_submit_rect = pygame.Rect(width // 2 - 100, height * 2 // 3, 200, 50)
+continue_button_rect = pygame.Rect(width // 2 - 100, height * 2 // 3, 200, 50)
+
+# Database setup
+def setup_database():
+    conn = sqlite3.connect('beer_pong_scores.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS high_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_name TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_score(player_name, score):
+    conn = sqlite3.connect('beer_pong_scores.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO high_scores (player_name, score) VALUES (?, ?)', (player_name, score))
+    conn.commit()
+    conn.close()
+
+def get_high_scores(limit=10):
+    conn = sqlite3.connect('beer_pong_scores.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT player_name, score, date_time FROM high_scores ORDER BY score DESC LIMIT ?', (limit,))
+    scores = cursor.fetchall()
+    conn.close()
+    return scores
+
+# Initialize database
+setup_database()
 
 def draw_cup(surface, x, y, radius, inner_color):
     pygame.draw.circle(surface, RED, (x, y), radius)
@@ -73,48 +112,95 @@ def draw_text(surface, text, font, color, x, y, center=True):
 def draw_high_scores(surface):
     font = pygame.font.Font(None, 36)
     draw_text(surface, "High Scores", font, BLACK, width * 5 // 6, height // 6)
-    for i, (name, score) in enumerate(high_scores[:10]):
-        draw_text(surface, f"{name}: {score}", font, BLACK, width * 5 // 6, height // 6 + (i + 1) * 40)
+
+    high_scores = get_high_scores()
+    for i, (name, score, date) in enumerate(high_scores):
+        date_obj = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+        date_str = date_obj.strftime('%m/%d/%Y')
+        score_text = f"{name}: {score} ({date_str})"
+        draw_text(surface, score_text, font, BLACK, width * 5 // 6, height // 6 + (i + 1) * 40)
 
 def handle_events():
     global player_name, game_state, score, start_time
     for event in pygame.event.get():
         if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             return False
-        elif game_state == "input_name":
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN and player_name:
-                    game_state = "start_screen"
-                elif event.key == pygame.K_BACKSPACE:
-                    player_name = player_name[:-1]
-                else:
-                    player_name += event.unicode
         elif game_state == "start_screen":
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if start_button_rect.collidepoint(event.pos):
+                    game_state = "input_name"
+                    player_name = ""  # Reset player name when entering name input screen
+        elif game_state == "input_name":
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    player_name = player_name[:-1]
+                elif event.key != pygame.K_RETURN:  # Allow typing except Enter key
+                    player_name += event.unicode
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if name_submit_rect.collidepoint(event.pos) and player_name.strip():
                     game_state = "countdown"
                     start_time = time.time()
         elif game_state == "playing":
             if event.type == pygame.MOUSEBUTTONDOWN:
                 handle_cup_click(event.pos)
+        elif game_state == "game_over":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if continue_button_rect.collidepoint(event.pos):
+                    game_state = "start_screen"
     return True
 
-def handle_cup_click(pos):
+def hit_cup(cup_number):
+    """
+    Hit a specific cup by its number (0-9).
+    Uses the same scoring rules as mouse clicks:
+    - First hit: 1 point (turns green)
+    - Second hit within 3 seconds: 3 points (turns blue)
+    - Third hit within 2 seconds: 5 points (turns red and enters cooldown)
+    """
     global score
+    if not 0 <= cup_number < len(cups):
+        return
+
+    cup = cups[cup_number]
     current_time = time.time()
-    for cup in cups:
+
+    if current_time - cup["cooldown"] >= 1:  # Check if cup is not in cooldown
+        if cup["hits"] == 2 and current_time - cup["hit_time"] < 2:
+            score += 5
+            cup["cooldown"] = current_time
+        elif cup["hits"] == 1 and current_time - cup["hit_time"] < 3:
+            cup["hits"] = 2
+            score += 3
+        else:
+            cup["hits"] = 1
+            score += 1
+        cup["hit_time"] = current_time
+
+def handle_cup_click(pos):
+    """
+    Modified to handle mouse clicks by finding the closest cup and calling hit_cup()
+    """
+    for i, cup in enumerate(cups):
         if pygame.math.Vector2(cup["pos"]).distance_to(pos) < cup["radius"]:
-            if current_time - cup["cooldown"] >= 1:
-                if cup["hits"] == 2 and current_time - cup["hit_time"] < 2:
-                    score += 5
-                    cup["cooldown"] = current_time
-                elif cup["hits"] == 1 and current_time - cup["hit_time"] < 3:
-                    cup["hits"] = 2
-                    score += 3
-                else:
-                    cup["hits"] = 1
-                    score += 1
-                cup["hit_time"] = current_time
+            hit_cup(i)
+            break
+
+# def handle_cup_click(pos):
+#     global score
+#     current_time = time.time()
+#     for cup in cups:
+#         if pygame.math.Vector2(cup["pos"]).distance_to(pos) < cup["radius"]:
+#             if current_time - cup["cooldown"] >= 1:
+#                 if cup["hits"] == 2 and current_time - cup["hit_time"] < 2:
+#                     score += 5
+#                     cup["cooldown"] = current_time
+#                 elif cup["hits"] == 1 and current_time - cup["hit_time"] < 3:
+#                     cup["hits"] = 2
+#                     score += 3
+#                 else:
+#                     cup["hits"] = 1
+#                     score += 1
+#                 cup["hit_time"] = current_time
 
 def main():
     global game_state, start_time, score
@@ -142,28 +228,46 @@ def main():
     background_image = pygame.transform.scale(background_image, (1200, 1200))
     image_rect = background_image.get_rect()
 
-    # Create start button
-    global start_button_rect
-    start_button_rect = pygame.Rect(width // 2 - 100, height * 3 // 4, 200, 50)
-
     running = True
     while running:
         running = handle_events()
-
         screen.fill(WHITE)
 
-        if game_state == "input_name":
-            draw_text(screen, "Enter your name:", font, BLACK, width // 2, height // 2 - 50)
-            draw_text(screen, player_name, font, BLACK, width // 2, height // 2)
-        elif game_state == "start_screen":
-            background_x = (screen.get_width() - image_rect.width) // 2   # Center horizontally
-            background_y = (screen.get_height() - image_rect.height) // 2  # Center vertically
-            #draw_text(screen, "Arrow Tech Hub", large_font, BLACK, width // 2, 150)
+        # Example of how to use hit_cup() with keyboard numbers (for testing)
+        keys = pygame.key.get_pressed()
+        if game_state == "playing":
+            for i in range(10):  # 0-9 keys
+                if keys[pygame.K_0 + i]:
+                    hit_cup(i)
+
+    # running = True
+    # while running:
+    #     running = handle_events()
+
+    #     screen.fill(WHITE)
+
+        if game_state == "start_screen":
+            # Draw start screen
+            background_x = (screen.get_width() - image_rect.width) // 2
+            background_y = (screen.get_height() - image_rect.height) // 2
             screen.blit(background_image, (background_x, background_y))
-            #draw_text(screen, "Presents", medium_font, BLACK, width // 2, 300)
             draw_text(screen, "Beer Pong", large_font, BLACK, width // 2, 450)
             pygame.draw.rect(screen, RED, start_button_rect)
             draw_text(screen, "Start Game", font, WHITE, start_button_rect.centerx, start_button_rect.centery)
+            draw_high_scores(screen)
+
+        elif game_state == "input_name":
+            # Draw name input screen
+            draw_text(screen, "Enter Your Name", medium_font, BLACK, width // 2, height // 3)
+            # Draw name input box
+            input_box_rect = pygame.Rect(width // 2 - 200, height // 2 - 25, 400, 50)
+            pygame.draw.rect(screen, BLACK, input_box_rect, 2)
+            draw_text(screen, player_name, font, BLACK, width // 2, height // 2)
+            # Draw start button
+            pygame.draw.rect(screen, RED, name_submit_rect)
+            draw_text(screen, "Start Game", font, WHITE, name_submit_rect.centerx, name_submit_rect.centery)
+            draw_high_scores(screen)
+
         elif game_state == "countdown":
             countdown = 3 - int(time.time() - start_time)
             if countdown > 0:
@@ -172,29 +276,26 @@ def main():
                 game_state = "playing"
                 start_time = time.time()
                 score = 0
-        elif game_state == "playing":
-            # Draw cup formation
-            draw_cup_formation(screen)
 
-            # Draw player info and timer
+        elif game_state == "playing":
+            draw_cup_formation(screen)
             elapsed_time = int(time.time() - start_time)
             remaining_time = max(0, game_duration - elapsed_time)
-            draw_text(screen, f"Player: {player_name} - Points {score} - Time: {remaining_time}", font, BLACK, 10, 10, False)
-
-            # Draw high scores
+            draw_text(screen, f"Player: {player_name} - Points {score}", font, BLACK, 10, 10, False)
+            draw_text(screen, f"Time: {remaining_time}", medium_font, BLACK, 10, 100, False)
             draw_high_scores(screen)
 
             if remaining_time == 0:
                 game_state = "game_over"
-                high_scores.append((player_name, score))
-                high_scores.sort(key=lambda x: x[1], reverse=True)
+                save_score(player_name, score)
+
         elif game_state == "game_over":
             draw_text(screen, "Game Over", large_font, BLACK, width // 2, height // 2 - 50)
             draw_text(screen, f"Your score: {score}", font, BLACK, width // 2, height // 2 + 50)
-            draw_text(screen, "Click to play again", font, BLACK, width // 2, height // 2 + 100)
+            # Draw continue button
+            pygame.draw.rect(screen, RED, continue_button_rect)
+            draw_text(screen, "Continue", font, WHITE, continue_button_rect.centerx, continue_button_rect.centery)
             draw_high_scores(screen)
-            if pygame.mouse.get_pressed()[0]:
-                game_state = "start_screen"
 
         pygame.display.flip()
         clock.tick(60)
