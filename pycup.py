@@ -185,23 +185,6 @@ def handle_cup_click(pos):
             hit_cup(i)
             break
 
-# def handle_cup_click(pos):
-#     global score
-#     current_time = time.time()
-#     for cup in cups:
-#         if pygame.math.Vector2(cup["pos"]).distance_to(pos) < cup["radius"]:
-#             if current_time - cup["cooldown"] >= 1:
-#                 if cup["hits"] == 2 and current_time - cup["hit_time"] < 2:
-#                     score += 5
-#                     cup["cooldown"] = current_time
-#                 elif cup["hits"] == 1 and current_time - cup["hit_time"] < 3:
-#                     cup["hits"] = 2
-#                     score += 3
-#                 else:
-#                     cup["hits"] = 1
-#                     score += 1
-#                 cup["hit_time"] = current_time
-
 def main():
     global game_state, start_time, score
 
@@ -239,12 +222,6 @@ def main():
             for i in range(10):  # 0-9 keys
                 if keys[pygame.K_0 + i]:
                     hit_cup(i)
-
-    # running = True
-    # while running:
-    #     running = handle_events()
-
-    #     screen.fill(WHITE)
 
         if game_state == "start_screen":
             # Draw start screen
