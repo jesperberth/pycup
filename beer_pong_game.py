@@ -4,6 +4,10 @@ import time
 import sqlite3
 from datetime import datetime
 from sensor_integration import start_sensor_system
+import threading
+
+sensor_system = None
+game_lock = threading.Lock()
 
 # Initialize Pygame
 pygame.init()
@@ -30,7 +34,6 @@ score = 0
 game_state = "start_screen"  # Changed initial state to start_screen
 start_time = 0
 game_duration = 10  # seconds
-sensor_system = None
 
 # Button rectangles
 start_button_rect = pygame.Rect(width // 2 - 100, height * 3 // 4, 200, 50)
@@ -70,16 +73,28 @@ def get_high_scores(limit=10):
 # Initialize database
 setup_database()
 
+def sensor_hit_cup(cup_number):
+    """Wrapper function to handle sensor triggers"""
+    global game_state
+    with game_lock:
+        print(f"Sensor triggered cup {cup_number}")
+        if game_state == "playing":
+            print(f"Calling hit_cup({cup_number})")
+            hit_cup(cup_number)
+        else:
+            print(f"Game not in playing state (current state: {game_state})")
+
 def sensor_triggered(cup_number):
     hit_cup(cup_number)
     print("Cup")
     print(cup_number)
 
 def initialize_sensors():
+    """Initialize the sensor system when the game starts"""
     global sensor_system
     try:
         sensor_system = start_sensor_system()
-        sensor_system.set_hit_callback(sensor_triggered)
+        sensor_system.set_hit_callback(sensor_hit_cup)
         print("Sensor system initialized successfully")
     except Exception as e:
         print(f"Failed to initialize sensors: {e}")
@@ -174,33 +189,32 @@ def handle_events():
     return True
 
 def hit_cup(cup_number):
-    print("Hit_Cup")
-    print(cup_number)
-    """
-    Hit a specific cup by its number (0-9).
-    Uses the same scoring rules as mouse clicks:
-    - First hit: 1 point (turns green)
-    - Second hit within 3 seconds: 3 points (turns blue)
-    - Third hit within 2 seconds: 5 points (turns red and enters cooldown)
-    """
+    """Hit a specific cup by its number (0-9)"""
     global score
     if not 0 <= cup_number < len(cups):
+        print(f"Invalid cup number: {cup_number}")
         return
 
     cup = cups[cup_number]
     current_time = time.time()
+    print(f"Processing hit on cup {cup_number}")
 
     if current_time - cup["cooldown"] >= 1:  # Check if cup is not in cooldown
         if cup["hits"] == 2 and current_time - cup["hit_time"] < 2:
             score += 5
             cup["cooldown"] = current_time
+            print(f"Cup {cup_number}: Third hit! +5 points")
         elif cup["hits"] == 1 and current_time - cup["hit_time"] < 3:
             cup["hits"] = 2
             score += 3
+            print(f"Cup {cup_number}: Second hit! +3 points")
         else:
             cup["hits"] = 1
             score += 1
+            print(f"Cup {cup_number}: First hit! +1 point")
         cup["hit_time"] = current_time
+    else:
+        print(f"Cup {cup_number} is in cooldown")
 
 def handle_cup_click(pos):
     """

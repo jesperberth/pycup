@@ -1,5 +1,5 @@
-import time
 from sensor_controller import SensorSystem
+import time
 
 def start_sensor_system():
     """Initialize and start the sensor system"""
@@ -10,17 +10,16 @@ def start_sensor_system():
     system.start_monitoring()
     return system
 
-# This part is only used for testing the sensors independently
+# Add a debug version of hit_cup to verify the sensor triggers
+def debug_hit_cup(cup_number):
+    print(f"DEBUG: hit_cup called for cup {cup_number}")
+
 if __name__ == '__main__':
     try:
-        # Test function to print when a sensor is triggered
-        def test_hit(sensor_id):
-            print(f"Test hit on sensor {sensor_id}")
-
         system = start_sensor_system()
-        system.set_hit_callback(test_hit)
+        system.set_hit_callback(debug_hit_cup)
 
-        # Keep the main thread running
+        print("Sensor system running. Press Ctrl+C to exit.")
         while True:
             time.sleep(1)
 
