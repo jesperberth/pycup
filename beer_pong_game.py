@@ -301,19 +301,55 @@ def main():
 
         # Your existing game state rendering code
         if game_state == "start_screen":
-            # ... existing start screen code ...
+            # Draw start screen
+            background_x = (screen.get_width() - image_rect.width) // 2
+            background_y = (screen.get_height() - image_rect.height) // 2
+            screen.blit(background_image, (background_x, background_y))
+            draw_text(screen, "Beer Pong", large_font, BLACK, width // 2, 450)
+            pygame.draw.rect(screen, RED, start_button_rect)
+            draw_text(screen, "Start Game", font, WHITE, start_button_rect.centerx, start_button_rect.centery)
+            draw_high_scores(screen)
             pass
         elif game_state == "input_name":
-            # ... existing input name code ...
+            # Draw name input screen
+            draw_text(screen, "Enter Your Name", medium_font, BLACK, width // 2, height // 3)
+            # Draw name input box
+            input_box_rect = pygame.Rect(width // 2 - 200, height // 2 - 25, 400, 50)
+            pygame.draw.rect(screen, BLACK, input_box_rect, 2)
+            draw_text(screen, player_name, font, BLACK, width // 2, height // 2)
+            # Draw start button
+            pygame.draw.rect(screen, RED, name_submit_rect)
+            draw_text(screen, "Start Game", font, WHITE, name_submit_rect.centerx, name_submit_rect.centery)
+            draw_high_scores(screen)
             pass
         elif game_state == "countdown":
-            # ... existing countdown code ...
+            countdown = 3 - int(time.time() - start_time)
+            if countdown > 0:
+                draw_text(screen, str(countdown), large_font, BLACK, width // 2, height // 2)
+            else:
+                game_state = "playing"
+                start_time = time.time()
+                score = 0
             pass
         elif game_state == "playing":
-            # ... existing playing code ...
+            draw_cup_formation(screen)
+            elapsed_time = int(time.time() - start_time)
+            remaining_time = max(0, game_duration - elapsed_time)
+            draw_text(screen, f"Player: {player_name} - Points {score}", font, BLACK, 10, 10, False)
+            draw_text(screen, f"Time: {remaining_time}", medium_font, BLACK, 10, 100, False)
+            draw_high_scores(screen)
+
+            if remaining_time == 0:
+                game_state = "game_over"
+                save_score(player_name, score)
             pass
         elif game_state == "game_over":
-            # ... existing game over code ...
+            draw_text(screen, "Game Over", large_font, BLACK, width // 2, height // 2 - 50)
+            draw_text(screen, f"Your score: {score}", font, BLACK, width // 2, height // 2 + 50)
+            # Draw continue button
+            pygame.draw.rect(screen, RED, continue_button_rect)
+            draw_text(screen, "Continue", font, WHITE, continue_button_rect.centerx, continue_button_rect.centery)
+            draw_high_scores(screen)
             pass
 
         # Give other threads a chance to run
