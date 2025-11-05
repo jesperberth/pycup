@@ -46,7 +46,7 @@ class UltrasonicSensor:
             dist = self.measure_distance()
             measurements.append(dist)
             time.sleep(0.1)
-        
+
         self.baseline = statistics.median(measurements)
         print(f"Sensor {self.sensor_id} baseline: {self.baseline:.2f} cm")
         return self.baseline
@@ -144,6 +144,15 @@ class SensorSystem:
                     # Check debounce: has enough time passed since last trigger?
                     time_since_last_trigger = current_time - sensor.last_trigger_time
                     can_trigger = time_since_last_trigger > self.debounce_time
+
+                    # Debug: Log when threshold is exceeded (even if debounced)
+                    if distance_change > threshold and sensor.sensor_id == 0:
+                        if not can_trigger and hasattr(sensor, 'debounce_log_count'):
+                            sensor.debounce_log_count += 1
+                            if sensor.debounce_log_count % 10 == 0:
+                                print(f"[DEBOUNCE] Sensor 0: change={distance_change:.2f}cm > threshold, waiting {self.debounce_time - time_since_last_trigger:.2f}s")
+                        elif can_trigger:
+                            print(f"[TRIGGER] Sensor 0: change={distance_change:.2f}cm > {threshold}cm threshold, triggering!")
 
                     if distance_change > threshold and can_trigger:
                         with self.lock:

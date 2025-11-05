@@ -8,7 +8,7 @@ from threading import Lock
 
 # Try to import sensor system (only available on Raspberry Pi)
 try:
-    from sensor_integration import start_sensor_system
+    from sensor_controller import SensorSystem
     SENSORS_AVAILABLE = True
 except ImportError:
     SENSORS_AVAILABLE = False
@@ -38,7 +38,7 @@ player_name = ""
 score = 0
 game_state = "start_screen"  # Changed initial state to start_screen
 start_time = 0
-game_duration = 10  # seconds
+game_duration = 30  # seconds
 
 # Sensor system variables
 sensor_system = None
@@ -183,18 +183,21 @@ def hit_cup(cup_number):
     global score
 
     current_state = game_state
+    trigger_time = time.time()
+
+    # Only process hits when game is active
+    if current_state != "playing":
+        # Less verbose logging when not in playing state
+        print(f"[{trigger_time:.2f}] [HIT_CUP] ⏸️  Sensor {cup_number} triggered but game is '{current_state}' (ignoring)")
+        return
+
+    # Detailed logging only during gameplay
     print(f"\n{'='*60}")
-    print(f"[HIT_CUP] SENSOR TRIGGERED!")
+    print(f"[{trigger_time:.2f}] [HIT_CUP] SENSOR TRIGGERED!")
     print(f"  Cup number: {cup_number}")
     print(f"  Current game_state: '{current_state}'")
     print(f"  Current score: {score}")
     print(f"{'='*60}\n")
-
-    # Only process hits when game is active
-    if current_state != "playing":
-        print(f"[HIT_CUP] ❌ IGNORING HIT - game not in playing state")
-        print(f"[HIT_CUP] Current state: '{current_state}' (need 'playing')\n")
-        return
 
     if not 0 <= cup_number < len(cups):
         print(f"[HIT_CUP] Invalid cup number: {cup_number}")
@@ -270,20 +273,26 @@ def main():
     # Initialize sensor system if not in test mode
     if not test_mode and SENSORS_AVAILABLE:
         try:
+            print("=" * 60)
             print("Initializing sensor system...")
-            sensor_system = start_sensor_system()
+            print("=" * 60)
 
-            # Set callback BEFORE starting monitoring (important!)
-            print("Setting hit_cup callback...")
+            # Use the same initialization as test_sensor_simple.py
+            sensor_system = SensorSystem()
+            sensor_system.setup_sensors()
+
+            print("\nCalibrating sensors (make sure cups are empty!)...")
+            sensor_system.calibrate_all_sensors()
+
+            print("\nStarting monitoring...")
             sensor_system.set_hit_callback(hit_cup)
-
-            # Now start monitoring
-            print("Starting sensor monitoring...")
             sensor_system.start_monitoring()
 
-            print(f"Sensor system initialized successfully!")
+            print("=" * 60)
+            print("✅ Sensor system initialized successfully!")
             print(f"Callback set: {sensor_system.hit_callback is not None}")
             print(f"Sensors running: {sensor_system.is_running()}")
+            print("=" * 60)
         except Exception as e:
             print(f"Failed to initialize sensors: {e}")
             print("Falling back to test mode (mouse/keyboard control)")
@@ -321,7 +330,7 @@ def main():
     while running:
         # Track game state changes and announce them
         if game_state != previous_game_state:
-            print(f"\n>>> GAME STATE CHANGED: '{previous_game_state}' → '{game_state}' <<<\n")
+            print(f"\n[{time.time():.2f}] >>> GAME STATE CHANGED: '{previous_game_state}' → '{game_state}' <<<\n")
             previous_game_state = game_state
 
         running = handle_events()

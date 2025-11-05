@@ -12,8 +12,8 @@ def start_sensor_system():
     system.calibrate_all_sensors()
 
     # Add a small delay to let things stabilize before monitoring
-    print("Waiting 2 seconds for sensors to stabilize...")
-    time.sleep(2)
+    print("Waiting 0.5 seconds for sensors to stabilize...")
+    time.sleep(0.5)
 
     return system
 
