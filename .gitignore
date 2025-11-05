@@ -1,2 +1,3 @@
 .venv
 beer_pong_scores.db
+__pycache__
