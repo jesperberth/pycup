@@ -77,7 +77,7 @@ class SensorSystem:
         self.running = False
         self.threads = []
         self.lock = Lock()
-        self.debounce_time = 1.0  # Debounce time in seconds
+        self.debounce_time = 0.5  # Debounce time in seconds (reduced for faster re-triggering)
         self.hit_callback = None
         print("SensorSystem initialized")
 
@@ -104,42 +104,86 @@ class SensorSystem:
         print("Calibration complete!")
 
     def monitor_sensor(self, sensor):
+        import sys
+        import traceback
+
         print(f"Started monitoring thread for sensor {sensor.sensor_id}")
-        while self.running:
-            try:
-                current_distance = sensor.measure_distance()
-                threshold = sensor.baseline * 0.10  # 10% threshold
-                current_time = time.time()
+        print(f"  Thread ID: {id(sensor)}")
+        print(f"  self.running = {self.running}")
 
-                # Add distance debugging every few seconds
-                if sensor.sensor_id == 0 and int(current_time) % 5 == 0:
-                    print(f"Sensor 0 distance: {current_distance:.2f} cm (baseline: {sensor.baseline:.2f} cm)")
+        loop_count = 0
+        try:
+            while self.running:
+                loop_count += 1
+                # Heartbeat every 100 loops (5 seconds at 0.05s sleep)
+                if loop_count % 100 == 0:
+                    print(f"[HEARTBEAT] Sensor {sensor.sensor_id} thread alive, loop #{loop_count}, self.running={self.running}")
 
-                if (abs(current_distance - sensor.baseline) > threshold and 
-                    current_time - sensor.last_trigger_time > self.debounce_time):
-                    with self.lock:
-                        print(f"Motion detected on sensor {sensor.sensor_id}!")
-                        print(f"Distance: {current_distance:.2f} cm (baseline: {sensor.baseline:.2f} cm)")
-                        if self.hit_callback:
-                            print(f"Calling hit callback for sensor {sensor.sensor_id}")
-                            self.hit_callback(sensor.sensor_id)
+                try:
+                    current_distance = sensor.measure_distance()
+                    # Use 1cm threshold for ping pong ball detection
+                    # This is sensitive enough to detect a ball dropping into a cup
+                    threshold = 1.0
+                    current_time = time.time()
+
+                    # Add distance debugging continuously for debugging
+                    if sensor.sensor_id == 0:
+                        # Print every 10 measurements (once per second at 0.1s sleep)
+                        if hasattr(sensor, 'measurement_count'):
+                            sensor.measurement_count += 1
                         else:
-                            print("Warning: No callback function set!")
-                        sensor.last_trigger_time = current_time
-            except Exception as e:
-                print(f"Error in sensor {sensor.sensor_id} monitoring: {e}")
-            
-            time.sleep(0.1)
-        
-        print(f"Stopped monitoring thread for sensor {sensor.sensor_id}")
+                            sensor.measurement_count = 0
+
+                        if sensor.measurement_count % 10 == 0:
+                            print(f"[SENSOR DEBUG] Sensor 0: {current_distance:.2f}cm (baseline: {sensor.baseline:.2f}cm, change: {sensor.baseline - current_distance:.2f}cm, threshold: {threshold:.2f}cm, loop={loop_count})")
+                            sys.stdout.flush()
+
+                    # Detect when distance gets SMALLER (ball/hand moves closer)
+                    distance_change = sensor.baseline - current_distance
+
+                    # Check debounce: has enough time passed since last trigger?
+                    time_since_last_trigger = current_time - sensor.last_trigger_time
+                    can_trigger = time_since_last_trigger > self.debounce_time
+
+                    if distance_change > threshold and can_trigger:
+                        with self.lock:
+                            print(f"\n🎯 Motion detected on sensor {sensor.sensor_id}!")
+                            print(f"   Distance: {current_distance:.2f} cm (baseline: {sensor.baseline:.2f} cm)")
+                            print(f"   Change: {distance_change:.2f} cm (threshold: {threshold:.2f} cm)")
+                            print(f"   Time since last trigger: {time_since_last_trigger:.2f}s\n")
+
+                            if self.hit_callback:
+                                print(f"   ✅ Calling hit callback for sensor {sensor.sensor_id}\n")
+                                self.hit_callback(sensor.sensor_id)
+                            else:
+                                print("   ⚠️ Warning: No callback function set!\n")
+
+                            sensor.last_trigger_time = current_time
+                    elif distance_change > threshold:
+                        # Would trigger but still in debounce period - only log occasionally
+                        if sensor.measurement_count % 5 == 0:  # Only print every 0.5 seconds
+                            print(f"[DEBOUNCE] Sensor {sensor.sensor_id} blocked: {distance_change:.2f}cm change, waiting {self.debounce_time - time_since_last_trigger:.2f}s more")
+                except Exception as e:
+                    print(f"❌ Error in sensor {sensor.sensor_id} measurement: {e}")
+                    traceback.print_exc()
+
+                time.sleep(0.05)  # Reduced from 0.1s to 0.05s for faster detection (20Hz polling)
+
+        except Exception as e:
+            print(f"💥 FATAL ERROR in sensor {sensor.sensor_id} thread: {e}")
+            traceback.print_exc()
+            sys.stdout.flush()
+        finally:
+            print(f"🛑 Stopped monitoring thread for sensor {sensor.sensor_id} (loop_count={loop_count}, self.running={self.running})")
 
     def start_monitoring(self):
         print("Starting sensor monitoring...")
         self.running = True
         self.threads = []
-        
+
         for sensor in self.sensors:
-            thread = Thread(target=self.monitor_sensor, args=(sensor,), daemon=True)
+            # Remove daemon=True to prevent premature thread termination
+            thread = Thread(target=self.monitor_sensor, args=(sensor,))
             thread.start()
             self.threads.append(thread)
         print(f"Started {len(self.threads)} monitoring threads")
