@@ -3,24 +3,35 @@
 Simple sensor test script - shows real-time distance readings
 and triggers when a ping pong ball is detected.
 
-Usage: python3 test_sensor_simple.py
+Usage:
+  python3 test_sensor_simple.py           # Run without debug output
+  python3 test_sensor_simple.py --debug   # Run with verbose debug output
 """
 
 from sensor_controller import SensorSystem
 import time
+import argparse
 
 def test_callback(sensor_id):
     print(f"🎯 HIT DETECTED on sensor {sensor_id}!")
 
 if __name__ == '__main__':
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Sensor test script')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enable verbose debug output')
+    args = parser.parse_args()
+
     try:
         print("=" * 60)
         print("SENSOR TEST - Real-time distance monitoring")
+        if args.debug:
+            print("(Debug mode enabled)")
         print("=" * 60)
 
         # Initialize sensor system
         print("\n1. Initializing sensor system...")
-        system = SensorSystem()
+        system = SensorSystem(debug=args.debug)
         system.setup_sensors()
 
         print("\n2. Calibrating (measuring baseline distance)...")

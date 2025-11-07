@@ -151,11 +151,18 @@ def handle_events():
                 if start_button_rect.collidepoint(event.pos):
                     game_state = "input_name"
                     player_name = ""  # Reset player name when entering name input screen
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                game_state = "input_name"
+                player_name = ""  # Reset player name when entering name input screen
         elif game_state == "input_name":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_BACKSPACE:
                     player_name = player_name[:-1]
-                elif event.key != pygame.K_RETURN:  # Allow typing except Enter key
+                elif event.key == pygame.K_RETURN:
+                    if player_name.strip():  # Only submit if name is not empty
+                        game_state = "countdown"
+                        start_time = time.time()
+                else:
                     player_name += event.unicode
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if name_submit_rect.collidepoint(event.pos) and player_name.strip():
@@ -244,6 +251,8 @@ def main():
                         help='Run in test mode (mouse/keyboard only, no sensors)')
     parser.add_argument('--nofullscreen', action='store_true',
                         help='Run in windowed mode (half screen size)')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enable verbose debug output from sensors')
     args = parser.parse_args()
     test_mode = args.test
 
@@ -278,7 +287,7 @@ def main():
             print("=" * 60)
 
             # Use the same initialization as test_sensor_simple.py
-            sensor_system = SensorSystem()
+            sensor_system = SensorSystem(debug=args.debug)
             sensor_system.setup_sensors()
 
             print("\nCalibrating sensors (make sure cups are empty!)...")
